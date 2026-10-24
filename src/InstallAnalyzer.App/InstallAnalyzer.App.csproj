@@ -10,7 +10,39 @@
     <Version>1.0.0</Version>
     <Product>Install Analyzer</Product>
     <Description>Find silent install and uninstall commands for Windows installers.</Description>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
+  <Target Name="KeepRuntimeNativeInDeps" AfterTargets="GeneratePublishDependencyFile">
+    <!-- Single-file publish writes a deps file that omits coreclr.dll. The host then cannot find the runtime
+         that is embedded in the executable and asks for a desktop install. Keep the build deps, which lists it. -->
+    <Copy SourceFiles="$(ProjectDepsFilePath)"
+          DestinationFiles="$(IntermediateDepsFilePath)"
+          Condition="'$(ProjectDepsFilePath)' != '' and '$(IntermediateDepsFilePath)' != '' and '$(ProjectDepsFilePath)' != '$(IntermediateDepsFilePath)'" />
+  </Target>
+  <Target Name="BundleRuntimeNativeLibraries" AfterTargets="ComputeResolvedFilesToPublishList" BeforeTargets="_ComputeFilesToBundle">
+    <ItemGroup>
+      <!-- The runtime pack marks coreclr and the JIT as DropFromSingleFile, and single-file publish then deletes them.
+           The app host still needs those libraries, so put them back into the one executable. hostfxr and hostpolicy
+           are already linked into the host. -->
+      <ResolvedFileToPublish Include="@(_FilesToDrop)" Condition="'%(Filename)' != 'hostfxr' and '%(Filename)' != 'hostpolicy' and '%(Filename)' != 'createdump'">
+        <ExcludeFromSingleFile>false</ExcludeFromSingleFile>
+        <DropFromSingleFile>false</DropFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+  <Target Name="RemovePublishedSymbols" AfterTargets="Publish">
+    <ItemGroup>
+      <_PublishedPdb Include="$(PublishDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_PublishedPdb)" />
+  </Target>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.1" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.1" />

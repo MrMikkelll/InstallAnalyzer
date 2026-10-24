@@ -62,11 +62,13 @@ public static class SignatureDetector
         var detections = new List<Detection>();
         var isPe = header.Length >= 2 && header[0] == (byte)'M' && header[1] == (byte)'Z';
         VersionStrings? version = null;
+        bool? is64Bit = null;
         var burnContainers = Array.Empty<BurnContainerSlice>();
         if (isPe && PeFile.TryOpen(path) is { } pe)
         {
             using (pe)
             {
+                is64Bit = pe.Is64Bit;
                 var resource = pe.ReadVersionResource();
                 if (resource is not null)
                     version = VersionStrings.FromMap(VersionResourceReader.Read(resource));
@@ -159,6 +161,7 @@ public static class SignatureDetector
             InstallScript = matched.Contains("script"),
             InstallShieldMsiEngine = matched.Contains("is-engine") || matched.Contains("is-stream") || matched.Contains("msi-api"),
             IsPortableExecutable = isPe,
+            Is64Bit = is64Bit,
             Msix = msix,
             BurnContainers = burnContainers,
             OleOffsets = scan.MarkerOffsets.TryGetValue("ole", out var ole) ? ole : [],

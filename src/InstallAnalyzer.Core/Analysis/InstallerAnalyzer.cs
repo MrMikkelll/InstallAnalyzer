@@ -65,7 +65,11 @@ public sealed class InstallerAnalyzer
             InstallScript = report.InstallScript,
             InstallShieldMsiEngine = report.InstallShieldMsiEngine,
             HelpSwitches = tokens,
-            ProductCodes = ProductCodes(report).ToList()
+            ProductCodes = ProductCodes(report).ToList(),
+            InstallDirectory = report.InstallDirectory,
+            AlternateInstallDirectory = report.AlternateInstallDirectory,
+            UninstallFileName = report.UninstallFileName,
+            InstallDirectoryEmbedded = report.InstallDirectoryEmbedded
         });
 
         var empty = string.IsNullOrWhiteSpace(output) && string.IsNullOrWhiteSpace(result.Error);
@@ -90,7 +94,12 @@ public sealed class InstallerAnalyzer
             Error = report.Error,
             CanQueryHelp = report.CanQueryHelp,
             InstallScript = report.InstallScript,
-            InstallShieldMsiEngine = report.InstallShieldMsiEngine
+            InstallShieldMsiEngine = report.InstallShieldMsiEngine,
+            InstallDirectory = report.InstallDirectory,
+            AlternateInstallDirectory = report.AlternateInstallDirectory,
+            UninstallFileName = report.UninstallFileName,
+            InstallDirectoryEmbedded = report.InstallDirectoryEmbedded,
+            InstallerWasStopped = result.InstallerWasStopped
         };
     }
 
@@ -132,18 +141,6 @@ public sealed class InstallerAnalyzer
         foreach (var payload in payloads)
             codes.AddRange(ProductCodes(payload));
 
-        var plan = CommandBuilder.Build(new CommandInput
-        {
-            FilePath = inspection.Identity.Path,
-            Family = inspection.Family,
-            Confidence = inspection.Confidence,
-            Msi = msi,
-            Msix = inspection.Msix,
-            InstallScript = inspection.InstallScript,
-            InstallShieldMsiEngine = inspection.InstallShieldMsiEngine,
-            ProductCodes = codes
-        });
-
         var identity = inspection.Identity;
         if (string.IsNullOrWhiteSpace(identity.ProductName) && msi?.ProductName is not null)
         {
@@ -160,6 +157,33 @@ public sealed class InstallerAnalyzer
                 Signer = identity.Signer
             };
         }
+
+        InstallLocation location;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            location = InstallLocationFinder.Find(stream, inspection.Family, identity.ProductName, inspection.Is64Bit);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            location = new InstallLocation();
+        }
+
+        var plan = CommandBuilder.Build(new CommandInput
+        {
+            FilePath = identity.Path,
+            Family = inspection.Family,
+            Confidence = inspection.Confidence,
+            Msi = msi,
+            Msix = inspection.Msix,
+            InstallScript = inspection.InstallScript,
+            InstallShieldMsiEngine = inspection.InstallShieldMsiEngine,
+            ProductCodes = codes,
+            InstallDirectory = location.Directory,
+            AlternateInstallDirectory = location.AlternateDirectory,
+            UninstallFileName = location.UninstallFileName,
+            InstallDirectoryEmbedded = location.Embedded
+        });
 
         return new AnalysisReport
         {
@@ -178,7 +202,11 @@ public sealed class InstallerAnalyzer
             Chain = chain,
             CanQueryHelp = inspection.IsPortableExecutable,
             InstallScript = inspection.InstallScript,
-            InstallShieldMsiEngine = inspection.InstallShieldMsiEngine
+            InstallShieldMsiEngine = inspection.InstallShieldMsiEngine,
+            InstallDirectory = location.Directory,
+            AlternateInstallDirectory = location.AlternateDirectory,
+            UninstallFileName = location.UninstallFileName,
+            InstallDirectoryEmbedded = location.Embedded
         };
     }
 

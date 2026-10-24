@@ -148,4 +148,9 @@ public sealed class AnalysisReport
     public bool CanQueryHelp { get; init; }
     public bool InstallScript { get; init; }
     public bool InstallShieldMsiEngine { get; init; }
+    public string? InstallDirectory { get; init; }
+    public string? AlternateInstallDirectory { get; init; }
+    public string? UninstallFileName { get; init; }
+    public bool InstallDirectoryEmbedded { get; init; }
+    public bool InstallerWasStopped { get; init; }
 }

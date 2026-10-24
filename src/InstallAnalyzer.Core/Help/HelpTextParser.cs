@@ -76,6 +76,29 @@ public static partial class HelpTextParser
 
     public static bool IsKnownSilent(string flag) => IsSilentTrigger(flag) || IsSilentCompanion(flag);
 
+    public static bool LooksLikeHelp(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+        if (text.Contains("/?", StringComparison.Ordinal)
+            || text.Contains("usage", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("command line", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("options:", StringComparison.OrdinalIgnoreCase))
+            return true;
+        var switches = Extract(text);
+        return switches.Count >= 2 || switches.Any(IsKnownSilent);
+    }
+
+    public static bool LooksLikeWizard(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || LooksLikeHelp(text))
+            return false;
+        return WizardMarkers().IsMatch(text);
+    }
+
+    [GeneratedRegex(@"(?i)\b(next\s*>|i agree|license agreement|install now|destination folder|choose components|welcome to the)\b")]
+    private static partial Regex WizardMarkers();
+
     public static string? BestTrigger(IEnumerable<string> flags)
     {
         var list = flags.ToList();

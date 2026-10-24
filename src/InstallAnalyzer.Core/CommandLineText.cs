@@ -4,6 +4,12 @@ namespace InstallAnalyzer.Core;
 
 public static class CommandLineText
 {
+    public static string WindowsCombine(string directory, string file)
+    {
+        var dir = directory.TrimEnd('\\', '/');
+        return dir + "\\" + file.TrimStart('\\', '/');
+    }
+
     public static string Quote(string value)
     {
         var builder = new StringBuilder(value.Length + 2);

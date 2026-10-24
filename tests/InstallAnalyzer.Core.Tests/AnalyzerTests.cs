@@ -13,6 +13,71 @@ namespace InstallAnalyzer.Core.Tests;
 public class AnalyzerTests
 {
     [Fact]
+    public void Nsis_uninstall_uses_the_program_files_folder()
+    {
+        var plan = CommandBuilder.Build(new CommandInput
+        {
+            FilePath = @"C:\Installers\npp.exe",
+            Family = InstallerFamily.Nsis,
+            Confidence = Confidence.High,
+            InstallDirectory = @"C:\Program Files\Notepad++",
+            AlternateInstallDirectory = @"C:\Program Files (x86)\Notepad++",
+            UninstallFileName = "uninstall.exe",
+            InstallDirectoryEmbedded = true
+        });
+
+        Assert.Equal("\"C:\\Program Files\\Notepad++\\uninstall.exe\" /S", plan.Uninstall!.Text);
+        Assert.Contains("\"C:\\Program Files (x86)\\Notepad++\\uninstall.exe\" /S", plan.Uninstall.Note);
+        Assert.Equal(Confidence.High, plan.Uninstall.Confidence);
+    }
+
+    [Fact]
+    public void Embedded_install_dir_becomes_the_uninstall_path()
+    {
+        using var dir = new TempDir();
+        var bytes = Prefix("NullsoftInst").Concat(Encoding.Unicode.GetBytes("$PROGRAMFILES64\\Northwind\0")).ToArray();
+        var path = dir.Write("Northwind.exe", bytes);
+        var report = new InstallerAnalyzer(new AnalyzerOptions { WorkingDirectory = dir.Work }).Analyze(path);
+        Assert.Equal(InstallerFamily.Nsis, report.Family);
+        Assert.Equal("\"C:\\Program Files\\Northwind\\uninstall.exe\" /S", report.Uninstall!.Text);
+        Assert.True(report.InstallDirectoryEmbedded);
+    }
+
+    [Fact]
+    public void Product_name_fills_a_program_files_uninstall_path()
+    {
+        var location = InstallLocationFinder.Find(new MemoryStream([0, 0, 0, 0]), InstallerFamily.Nsis, "Notepad++", is64Bit: true);
+        Assert.Equal(@"C:\Program Files\Notepad++", location.Directory);
+        Assert.Equal(@"C:\Program Files (x86)\Notepad++", location.AlternateDirectory);
+        Assert.False(location.Embedded);
+        Assert.Equal("uninstall.exe", location.UninstallFileName);
+
+        var x86 = InstallLocationFinder.Find(new MemoryStream([0, 0, 0, 0]), InstallerFamily.Nsis, "Notepad++", is64Bit: false);
+        Assert.Equal(@"C:\Program Files (x86)\Notepad++", x86.Directory);
+    }
+
+    [Fact]
+    public void Help_probe_rejects_install_switches()
+    {
+        Assert.False(HelpSwitches.IsSafeProbe(""));
+        Assert.False(HelpSwitches.IsSafeProbe("/S"));
+        Assert.False(HelpSwitches.IsSafeProbe("/silent"));
+        Assert.False(HelpSwitches.IsSafeProbe("/quiet"));
+        Assert.False(HelpSwitches.IsSafeProbe("/VERYSILENT"));
+        Assert.False(HelpSwitches.IsSafeProbe("/qn"));
+        Assert.False(HelpSwitches.IsSafeProbe("/c echo /VERYSILENT"));
+        Assert.True(HelpSwitches.IsSafeProbe("/?"));
+        Assert.True(HelpSwitches.IsSafeProbe("--help"));
+        foreach (InstallerFamily family in Enum.GetValues<InstallerFamily>())
+        {
+            var candidates = HelpSwitches.Candidates(family);
+            Assert.NotEmpty(candidates);
+            Assert.All(candidates, flag => Assert.True(HelpSwitches.IsSafeProbe(flag)));
+            Assert.DoesNotContain(candidates, HelpTextParser.IsKnownSilent);
+        }
+    }
+
+    [Fact]
     public void Recommends_inno_commands()
     {
         var plan = CommandBuilder.Build(Input(InstallerFamily.InnoSetup, Confidence.High));

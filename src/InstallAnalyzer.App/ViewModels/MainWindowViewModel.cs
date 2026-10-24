@@ -126,8 +126,10 @@ public partial class MainWindowViewModel : ObservableObject
             var result = await _help.RunAsync(new HelpQueryRequest
             {
                 FilePath = item.FilePath,
-                Arguments = item.HelpArgument,
-                Timeout = TimeSpan.FromSeconds(12)
+                Family = item.Family,
+                Arguments = HelpSwitches.Candidates(item.Family),
+                Timeout = TimeSpan.FromSeconds(3),
+                Progress = new Progress<string>(text => BusyText = text)
             }, CancellationToken.None);
             item.Load(InstallerAnalyzer.ApplyHelp(item.Source, result));
             StatusText = result.Error ?? "";

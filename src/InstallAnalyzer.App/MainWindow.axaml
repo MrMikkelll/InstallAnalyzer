@@ -172,8 +172,8 @@
         <StackPanel Spacing="12">
           <TextBlock Text="Query help?" FontSize="18" FontWeight="SemiBold"/>
           <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="#44403C"
-                     Text="This starts the installer with a help switch, waits about 12 seconds, then stops it. A few installers ignore the help switch and begin installing. Run this only on a file you trust, preferably in a VM."/>
-          <TextBlock FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" Foreground="#78716C"
+                     Text="This tries each help switch inside a sandbox that cannot change Program Files, the user profile, or the network. The installer is stopped as soon as it opens. Nothing is installed."/>
+          <TextBlock FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" Foreground="#78716C" TextWrapping="Wrap"
                      Text="{Binding Selected.HelpArgument}"/>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button Classes="quiet" Content="Cancel" Command="{Binding CancelHelpCommand}"/>

@@ -89,7 +89,7 @@ public partial class FileItem : ObservableObject
         HelpMessage = HelpMessageFor(report);
         HasHelpMessage = HelpMessage.Length > 0;
         CanQueryHelp = report.CanQueryHelp && report.Error is null;
-        HelpArgument = HelpSwitches.For(report.Family);
+        HelpArgument = string.Join("   ", HelpSwitches.Candidates(report.Family));
 
         Switches.Clear();
         foreach (var item in report.Switches)
@@ -147,12 +147,14 @@ public partial class FileItem : ObservableObject
 
     private static string HelpMessageFor(AnalysisReport report)
     {
-        if (report.HelpWasEmpty && report.HelpTimedOut)
-            return "The process was stopped after 12 seconds and did not write help text. Graphical installers often show a dialog instead of console output.";
+        if (!string.IsNullOrWhiteSpace(report.HelpOutput) && report.InstallerWasStopped)
+            return "An earlier switch opened the installer and was stopped. Nothing was installed.";
+        if (report.InstallerWasStopped)
+            return "A help switch opened the installer. It was stopped immediately. Nothing was installed.";
         if (report.HelpWasEmpty)
-            return "The installer did not write help text. Graphical installers often show a dialog instead of console output.";
+            return "None of the help switches produced help text. The installer was not left running.";
         if (report.HelpTimedOut)
-            return "The process was stopped after 12 seconds.";
+            return "The help process was stopped. Nothing was installed.";
         return "";
     }
 

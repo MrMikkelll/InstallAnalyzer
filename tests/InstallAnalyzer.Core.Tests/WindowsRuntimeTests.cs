@@ -38,26 +38,28 @@ public class WindowsRuntimeTests
             return;
 
         var runner = new WindowsHelpQuery();
-        var echo = await runner.RunAsync(new HelpQueryRequest
+        var refused = await runner.RunAsync(new HelpQueryRequest
         {
             FilePath = Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-            Arguments = "/c echo /VERYSILENT",
-            Timeout = TimeSpan.FromSeconds(10)
-        }, CancellationToken.None);
-
-        Assert.Null(echo.Error);
-        Assert.Contains("/VERYSILENT", echo.StandardOutput);
-        Assert.False(echo.TimedOut);
-
-        var hung = await runner.RunAsync(new HelpQueryRequest
-        {
-            FilePath = Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-            Arguments = "/c ping -n 20 127.0.0.1",
+            Arguments = ["/S", "/c ping -n 30 127.0.0.1"],
             Timeout = TimeSpan.FromSeconds(2)
         }, CancellationToken.None);
 
-        Assert.True(hung.TimedOut);
-        Thread.Sleep(500);
+        Assert.NotNull(refused.Error);
+        Assert.Contains("nothing was run", refused.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(Process.GetProcessesByName("PING"), process => !process.HasExited);
+
+        var echo = await runner.RunAsync(new HelpQueryRequest
+        {
+            FilePath = Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+            Arguments = ["/?"] ,
+            Timeout = TimeSpan.FromSeconds(8)
+        }, CancellationToken.None);
+
+        Assert.True(echo.Error is null, echo.Error ?? "");
+        Assert.Contains("CMD", echo.StandardOutput, StringComparison.OrdinalIgnoreCase);
+
+        Thread.Sleep(300);
         Assert.DoesNotContain(Process.GetProcessesByName("PING"), process => !process.HasExited);
     }
 

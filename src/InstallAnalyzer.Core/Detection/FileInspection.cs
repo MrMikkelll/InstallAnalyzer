@@ -13,6 +13,7 @@ public sealed class FileInspection
     public bool InstallScript { get; init; }
     public bool InstallShieldMsiEngine { get; init; }
     public bool IsPortableExecutable { get; init; }
+    public bool? Is64Bit { get; init; }
     public MsixFacts? Msix { get; init; }
     public IReadOnlyList<BurnContainerSlice> BurnContainers { get; init; } = [];
     public IReadOnlyList<long> OleOffsets { get; init; } = [];

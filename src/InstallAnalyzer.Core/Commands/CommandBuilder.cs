@@ -11,6 +11,10 @@ public sealed class CommandInput
     public bool InstallShieldMsiEngine { get; init; }
     public IReadOnlyList<string> HelpSwitches { get; init; } = [];
     public IReadOnlyList<string> ProductCodes { get; init; } = [];
+    public string? InstallDirectory { get; init; }
+    public string? AlternateInstallDirectory { get; init; }
+    public string? UninstallFileName { get; init; }
+    public bool InstallDirectoryEmbedded { get; init; }
 }
 
 public sealed class CommandPlan
@@ -60,12 +64,12 @@ public static class CommandBuilder
                 break;
             case InstallerFamily.InnoSetup:
                 install = Make("Install", $"{file} /VERYSILENT /SUPPRESSMSGBOXES /NORESTART", $"{file} /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG={CommandLineText.Quote(InstallLog)}", confidence, "Reboot prompts are suppressed.");
-                uninstall = Make("Uninstall", "unins000.exe /VERYSILENT /NORESTART", null, confidence, "unins000.exe is created in the install directory, so this command has no full path yet.");
+                uninstall = FolderUninstall(input, confidence, "unins000.exe /VERYSILENT /NORESTART", "unins000.exe is created in the install directory, so this command has no full path yet.");
                 AddBuiltIn(switches, install, ("/VERYSILENT", "No wizard and no progress window."), ("/SUPPRESSMSGBOXES", "Answer message boxes with the default."), ("/NORESTART", "Do not reboot."), ("/LOG", "Write an install log."), ("/DIR", "Override the install directory."), ("/TASKS", "Choose which tasks to run."));
                 break;
             case InstallerFamily.Nsis:
-                install = Make("Install", $"{file} /S", null, confidence, "/D=C:\\Path overrides the directory. It must be last and it must not be quoted. Uninstall.exe /S is created in the install directory. NSIS has no standard log switch.");
-                uninstall = Make("Uninstall", "Uninstall.exe /S", null, confidence, "Uninstall.exe is created in the install directory.");
+                install = Make("Install", $"{file} /S", null, confidence, "/D=C:\\Path overrides the directory. It must be last and it must not be quoted. NSIS has no standard log switch.");
+                uninstall = FolderUninstall(input, confidence, "uninstall.exe /S", "The install folder was not found, so this command has no full path yet.");
                 AddBuiltIn(switches, install, ("/S", "Silent install."), ("/NCRC", "Skip the CRC check."), ("/D=", "Set the directory. Must be last and unquoted."));
                 break;
             case InstallerFamily.WixBurn:
@@ -94,7 +98,7 @@ public static class CommandBuilder
                 break;
             case InstallerFamily.Squirrel:
                 install = Make("Install", $"{file} --silent", null, confidence, "Squirrel has no standard log switch.");
-                uninstall = Make("Uninstall", "Update.exe --uninstall -s", null, confidence, "Update.exe lives in the application directory after install. Some packages also accept the setup executable with --uninstall -s.");
+                uninstall = FolderUninstall(input, confidence, "Update.exe --uninstall -s", "Update.exe lives in the application directory after install. Some packages also accept the setup executable with --uninstall -s.");
                 AddBuiltIn(switches, install, ("--silent", "Silent setup."), ("--uninstall", "Uninstall flag used by some Squirrel setups."));
                 break;
             case InstallerFamily.AdvancedInstaller:
@@ -106,12 +110,12 @@ public static class CommandBuilder
                 break;
             case InstallerFamily.InstallAware:
                 install = Make("Install", $"{file} /s", $"{file} /s /l={CommandLineText.Quote(InstallLog)}", confidence, "Reboot behavior depends on the package.");
-                advisory = "The uninstaller is created in the install directory and accepts /s.";
+                uninstall = FolderUninstall(input, confidence, "uninstall.exe /s", "The uninstaller is created in the install directory and accepts /s.");
                 AddBuiltIn(switches, install, ("/s", "Silent InstallAware setup."), ("/l", "Write a log."));
                 break;
             case InstallerFamily.QtInstallerFramework:
                 install = Make("Install", $"{file} --accept-licenses --default-answer --confirm-command install", null, confidence, "The installer answers prompts with defaults.");
-                uninstall = Make("Uninstall", "maintenancetool.exe purge --confirm-command", null, confidence, "maintenancetool.exe is created in the install directory.");
+                uninstall = FolderUninstall(input, confidence, "maintenancetool.exe purge --confirm-command", "maintenancetool.exe is created in the install directory.");
                 AddBuiltIn(switches, install, ("install", "Start installation."), ("--accept-licenses", "Accept licenses."), ("--default-answer", "Use default answers."), ("--confirm-command", "Do not ask for confirmation."));
                 break;
             case InstallerFamily.SevenZipSfx:
@@ -125,7 +129,7 @@ public static class CommandBuilder
                 AddBuiltIn(switches, install, ("/Q", "Suppress prompts."), ("/T", "Extract to a folder."), ("/C", "Run a command after extract."));
                 break;
             default:
-                advisory = "No reliable silent command was found for this file. Query help only if you trust it. A few installers ignore the help switch and start installing.";
+                advisory = "No reliable silent command was found for this file. Query help tries help switches in a sandbox and does not install the file.";
                 break;
         }
 
@@ -176,6 +180,48 @@ public static class CommandBuilder
         }
 
         install = Make("Install", string.Join(' ', parts), null, Confidence.Low, "Taken from the installer's help text.");
+    }
+
+    private static RecommendedCommand FolderUninstall(CommandInput input, Confidence confidence, string relative, string missingNote)
+    {
+        var fileName = string.IsNullOrWhiteSpace(input.UninstallFileName) ? FirstToken(relative) : input.UninstallFileName;
+        var arguments = ArgumentsAfterFile(relative);
+        if (string.IsNullOrWhiteSpace(input.InstallDirectory) || string.IsNullOrWhiteSpace(fileName))
+            return Make("Uninstall", relative, null, confidence, missingNote);
+
+        var command = CommandLineText.Quote(CommandLineText.WindowsCombine(input.InstallDirectory, fileName));
+        if (!string.IsNullOrWhiteSpace(arguments))
+            command += " " + arguments;
+        var level = input.InstallDirectoryEmbedded ? confidence : Confidence.Medium;
+        return Make("Uninstall", command, null, level, LocationNote(input, fileName, arguments));
+    }
+
+    private static string LocationNote(CommandInput input, string fileName, string arguments)
+    {
+        var note = input.InstallDirectoryEmbedded
+            ? "The folder was read from the installer."
+            : "The folder name comes from the product name.";
+        if (!string.IsNullOrWhiteSpace(input.AlternateInstallDirectory))
+        {
+            var alternate = CommandLineText.Quote(CommandLineText.WindowsCombine(input.AlternateInstallDirectory, fileName));
+            if (!string.IsNullOrWhiteSpace(arguments))
+                alternate += " " + arguments;
+            note += " The other common folder uses " + alternate + ".";
+        }
+
+        return note;
+    }
+
+    private static string FirstToken(string command)
+    {
+        var token = command.Split(' ', 2)[0].Trim('"');
+        return token;
+    }
+
+    private static string ArgumentsAfterFile(string command)
+    {
+        var split = command.Split(' ', 2);
+        return split.Length == 2 ? split[1].Trim() : "";
     }
 
     private static RecommendedCommand ProductUninstall(string? productCode, string file, Confidence confidence, string missingNote)

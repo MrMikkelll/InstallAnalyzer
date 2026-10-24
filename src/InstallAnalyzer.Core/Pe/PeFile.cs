@@ -27,6 +27,7 @@ public sealed class PeFile : IDisposable
     public uint ResourceSize { get; private init; }
     public uint CertificateOffset { get; private init; }
     public uint CertificateSize { get; private init; }
+    public bool Is64Bit { get; private init; }
     public long Length => _stream.Length;
 
     public static PeFile? TryOpen(string path)
@@ -120,6 +121,7 @@ public sealed class PeFile : IDisposable
         if (peSig[0] != (byte)'P' || peSig[1] != (byte)'E' || peSig[2] != 0 || peSig[3] != 0)
             return false;
 
+        var machine = BitConverter.ToUInt16(peSig[4..]);
         var sectionCount = BitConverter.ToUInt16(peSig[6..]);
         var optionalSize = BitConverter.ToUInt16(peSig[20..]);
         if (sectionCount > 96 || optionalSize > 1024)
@@ -180,7 +182,8 @@ public sealed class PeFile : IDisposable
             ResourceRva = resourceRva,
             ResourceSize = resourceSize,
             CertificateOffset = certificateOffset,
-            CertificateSize = certificateSize
+            CertificateSize = certificateSize,
+            Is64Bit = machine is 0x8664 or 0xAA64
         };
         return true;
     }
