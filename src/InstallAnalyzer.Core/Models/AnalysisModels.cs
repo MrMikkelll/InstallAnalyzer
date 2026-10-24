@@ -153,4 +153,5 @@ public sealed class AnalysisReport
     public string? UninstallFileName { get; init; }
     public bool InstallDirectoryEmbedded { get; init; }
     public bool InstallerWasStopped { get; init; }
+    public bool RelaxedSandbox { get; init; }
 }

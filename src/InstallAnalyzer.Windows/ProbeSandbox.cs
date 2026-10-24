@@ -88,6 +88,9 @@ internal sealed class ProbeSandbox : IDisposable
     public static void GrantReadExecute(string path, IntPtr sid, bool directory) =>
         Grant(path, SeFileObject, sid, FileGenericReadExecute, directory);
 
+    public static void GrantFull(string path, IntPtr sid) =>
+        Grant(path, SeFileObject, sid, 0x001F01FF, inherit: true);
+
     public void Dispose()
     {
         if (Desktop != IntPtr.Zero)

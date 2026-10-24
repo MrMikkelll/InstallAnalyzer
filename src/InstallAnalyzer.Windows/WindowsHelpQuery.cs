@@ -11,6 +11,7 @@ namespace InstallAnalyzer.Windows;
 public sealed class WindowsHelpQuery : IHelpQueryRunner
 {
     private const uint CreateSuspended = 0x00000004;
+    private const uint CreateUnicodeEnvironment = 0x00000400;
     private const uint CreateNoWindow = 0x08000000;
     private const uint ExtendedStartupInfo = 0x00080000;
     private const int StartfUseStdHandles = 0x00000100;
@@ -27,6 +28,11 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
     private const uint ActiveProcessLimit = 0x00000008;
     private const uint WaitTimeout = 0x00000102;
     private const int ErrorElevationRequired = 740;
+    private const int ErrorIllegalDllRelocation = 623;
+    private const uint TokenAdjustDefault = 0x0080;
+    private const uint TokenQuery = 0x0008;
+    private const int TokenIntegrityLevel = 25;
+    private const uint SeGroupIntegrity = 0x20;
     private const int MaxOutput = 256 * 1024;
     private const int ProcThreadAttributeSecurityCapabilities = 0x00020009;
     private const int ProcThreadAttributeHandleList = 0x00020002;
@@ -57,6 +63,7 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
             var chunks = new List<string>();
             var stopped = false;
             var timedOut = false;
+            var relaxed = false;
             string? startError = null;
             var timeout = request.Timeout <= TimeSpan.Zero ? TimeSpan.FromSeconds(3) : request.Timeout;
             foreach (var flag in switches)
@@ -64,6 +71,8 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 request.Progress?.Report("Trying " + flag + " without installing…");
                 var attempt = ProbeOnce(request.FilePath, flag, timeout, sandbox, cancellationToken);
+                if (attempt.RelaxedSandbox)
+                    relaxed = true;
                 if (attempt.StoppedInstaller)
                     stopped = true;
                 if (attempt.TimedOut)
@@ -87,6 +96,7 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
                 {
                     Error = startError,
                     InstallerWasStopped = stopped,
+                    RelaxedSandbox = relaxed,
                     Attempted = string.Join(" ", switches)
                 };
             }
@@ -96,18 +106,42 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
                 StandardOutput = string.Join("\n\n", chunks).Trim(),
                 TimedOut = timedOut && chunks.Count == 0,
                 InstallerWasStopped = stopped,
+                RelaxedSandbox = relaxed,
                 Attempted = string.Join(" ", switches)
             };
         }
     }
 
+    private enum LaunchMode
+    {
+        ContainerDesktop,
+        Container,
+        LowIntegrity
+    }
+
     private static Attempt ProbeOnce(string filePath, string flag, TimeSpan timeout, ProbeSandbox sandbox, CancellationToken cancellationToken)
+    {
+        Attempt? last = null;
+        foreach (var mode in new[] { LaunchMode.ContainerDesktop, LaunchMode.Container, LaunchMode.LowIntegrity })
+        {
+            last = Launch(filePath, flag, timeout, sandbox, cancellationToken, mode);
+            if (!last.StartFailed || last.Win32Error != ErrorIllegalDllRelocation)
+                return last;
+        }
+
+        return last ?? Attempt.Failed("The sandboxed help process could not be started. The installer was not run.");
+    }
+
+    private static Attempt Launch(string filePath, string flag, TimeSpan timeout, ProbeSandbox sandbox, CancellationToken cancellationToken, LaunchMode mode)
     {
         string executable;
         string? copyDirectory = null;
+        var lowIntegrity = mode == LaunchMode.LowIntegrity;
         try
         {
-            executable = PrepareExecutable(filePath, sandbox, ref copyDirectory);
+            executable = lowIntegrity
+                ? Path.GetFullPath(filePath)
+                : PrepareExecutable(filePath, sandbox, ref copyDirectory);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -128,11 +162,15 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
         var attributeList = IntPtr.Zero;
         var capabilities = IntPtr.Zero;
         var desktopPointer = IntPtr.Zero;
+        var environment = IntPtr.Zero;
         var attributesReady = false;
+        string? probeTemp = null;
         GCHandle handles = default;
 
         try
         {
+            probeTemp = CreateProbeTemp(lowIntegrity, sandbox);
+            environment = EnvironmentWithTemp(probeTemp);
             job = Native.CreateJobObject(IntPtr.Zero, null);
             if (job == IntPtr.Zero || !ConfigureJob(job))
                 return Attempt.Failed("Help query was not started because the process job could not be created. The installer was not run.");
@@ -154,8 +192,65 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
 
             var inherited = new[] { stdin, stdoutWrite, stderrWrite };
             handles = GCHandle.Alloc(inherited, GCHandleType.Pinned);
-            if (sandbox.DesktopName is not null)
+            if (!lowIntegrity && mode == LaunchMode.ContainerDesktop && sandbox.DesktopName is not null)
                 desktopPointer = Marshal.StringToHGlobalUni(sandbox.DesktopName);
+            if (lowIntegrity)
+            {
+                if (sandbox.Desktop != IntPtr.Zero && MarkLowIntegrityObject(sandbox.Desktop) && sandbox.DesktopName is not null)
+                    desktopPointer = Marshal.StringToHGlobalUni(sandbox.DesktopName);
+                var plain = new Native.StartupInfo
+                {
+                    cb = Marshal.SizeOf<Native.StartupInfo>(),
+                    dwFlags = StartfUseStdHandles | StartfUseShowWindow,
+                    wShowWindow = SwHide,
+                    hStdInput = stdin,
+                    hStdOutput = stdoutWrite,
+                    hStdError = stderrWrite,
+                    lpDesktop = desktopPointer
+                };
+                var plainCommand = new StringBuilder("\"" + executable.Replace("\"", "\\\"") + "\" " + flag);
+                if (!Native.CreateProcessSimple(executable, plainCommand, IntPtr.Zero, IntPtr.Zero, true,
+                        CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment, environment, probeTemp, ref plain, out var plainInfo)
+                    && desktopPointer != IntPtr.Zero)
+                {
+                    plain.lpDesktop = IntPtr.Zero;
+                    if (!Native.CreateProcessSimple(executable, plainCommand, IntPtr.Zero, IntPtr.Zero, true,
+                            CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment, environment, probeTemp, ref plain, out plainInfo))
+                    {
+                        var plainError = Marshal.GetLastWin32Error();
+                        return Attempt.Failed(StartError(plainError), plainError);
+                    }
+                }
+                else if (plainInfo.hProcess == IntPtr.Zero)
+                {
+                    var plainError = Marshal.GetLastWin32Error();
+                    return Attempt.Failed(StartError(plainError), plainError);
+                }
+
+                process = plainInfo.hProcess;
+                thread = plainInfo.hThread;
+                var plainId = plainInfo.dwProcessId;
+                if (!Native.AssignProcessToJobObject(job, process) || !LowerIntegrity(process))
+                {
+                    Native.TerminateProcess(process, 1);
+                    return Attempt.Failed("The low-integrity probe could not be contained, so it was stopped before it ran. Nothing was installed.");
+                }
+
+                var plainOut = stdoutRead;
+                var plainErr = stderrRead;
+                stdoutTask = Task.Run(() => ReadPipe(plainOut));
+                stderrTask = Task.Run(() => ReadPipe(plainErr));
+                stdoutRead = IntPtr.Zero;
+                stderrRead = IntPtr.Zero;
+                Close(ref stdoutWrite);
+                Close(ref stderrWrite);
+                Close(ref stdin);
+                var plainKeys = UninstallKeyCount();
+                Native.ResumeThread(thread);
+                var plainAttempt = Watch(job, process, plainId, sandbox, timeout, cancellationToken, stdoutTask, stderrTask, plainKeys);
+                return CopyRelaxed(plainAttempt);
+            }
+
             capabilities = Marshal.AllocHGlobal(Marshal.SizeOf<Native.SecurityCapabilities>());
             Marshal.StructureToPtr(new Native.SecurityCapabilities
             {
@@ -194,15 +289,11 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
             };
 
             var commandLine = new StringBuilder("\"" + executable.Replace("\"", "\\\"") + "\" " + flag);
-            var directory = Path.GetDirectoryName(executable);
             if (!Native.CreateProcess(executable, commandLine, IntPtr.Zero, IntPtr.Zero, true,
-                    CreateSuspended | CreateNoWindow | ExtendedStartupInfo, IntPtr.Zero, directory, ref startup, out var info))
+                    CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment | ExtendedStartupInfo, environment, probeTemp, ref startup, out var info))
             {
                 var error = Marshal.GetLastWin32Error();
-                var message = error == ErrorElevationRequired
-                    ? "Windows asked for administrator approval, so the help query was not started."
-                    : "The sandboxed help process could not be started (" + error + "). The installer was not run outside the sandbox.";
-                return Attempt.Failed(message);
+                return Attempt.Failed(StartError(error), error);
             }
 
             process = info.hProcess;
@@ -227,6 +318,10 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
             var uninstallKeys = UninstallKeyCount();
             Native.ResumeThread(thread);
             return Watch(job, process, processId, sandbox, timeout, cancellationToken, stdoutTask, stderrTask, uninstallKeys);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Attempt.Failed("The probe temp folder could not be created. The installer was not run. " + ex.Message);
         }
         finally
         {
@@ -256,7 +351,96 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
                 Native.CloseHandle(job);
             if (desktopPointer != IntPtr.Zero)
                 Marshal.FreeHGlobal(desktopPointer);
+            if (environment != IntPtr.Zero)
+                Marshal.FreeHGlobal(environment);
             DeleteCopy(copyDirectory);
+            DeleteCopy(probeTemp);
+        }
+    }
+
+    private static string CreateProbeTemp(bool lowIntegrity, ProbeSandbox sandbox)
+    {
+        var root = lowIntegrity
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "LocalLow", "InstallAnalyzer")
+            : !string.IsNullOrWhiteSpace(sandbox.PackageFolder)
+                ? sandbox.PackageFolder!
+                : Path.Combine(Path.GetTempPath(), "InstallAnalyzer", "probe");
+        var directory = Path.Combine(root, Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(directory);
+        if (lowIntegrity)
+            MarkLowIntegrity(directory);
+        else if (sandbox.Sid != IntPtr.Zero)
+            ProbeSandbox.GrantFull(directory, sandbox.Sid);
+        return directory;
+    }
+
+    private static IntPtr EnvironmentWithTemp(string temp)
+    {
+        var entries = new List<string>();
+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+        {
+            var key = entry.Key?.ToString();
+            if (string.IsNullOrEmpty(key))
+                continue;
+            if (key.Equals("TEMP", StringComparison.OrdinalIgnoreCase) || key.Equals("TMP", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var value = entry.Value?.ToString() ?? "";
+            if (value.Contains('\0'))
+                continue;
+            entries.Add(key + "=" + value);
+        }
+
+        entries.Add("TEMP=" + temp);
+        entries.Add("TMP=" + temp);
+        return Marshal.StringToHGlobalUni(string.Join('\0', entries) + "\0\0");
+    }
+
+    private static void MarkLowIntegrity(string path)
+    {
+        if (!Native.ConvertStringSidToSid("S-1-16-4096", out var sid))
+            return;
+        try
+        {
+            ApplyLowLabel(sid, acl => Native.SetNamedSecurityInfo(path, 1, 0x10, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, acl));
+        }
+        finally
+        {
+            Native.LocalFree(sid);
+        }
+    }
+
+    private static bool MarkLowIntegrityObject(IntPtr handle)
+    {
+        if (!Native.ConvertStringSidToSid("S-1-16-4096", out var sid))
+            return false;
+        try
+        {
+            var applied = false;
+            ApplyLowLabel(sid, acl =>
+            {
+                applied = Native.SetSecurityInfo(handle, 3, 0x10, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, acl) == 0;
+            });
+            return applied;
+        }
+        finally
+        {
+            Native.LocalFree(sid);
+        }
+    }
+
+    private static void ApplyLowLabel(IntPtr sid, Action<IntPtr> apply)
+    {
+        var aclSize = 256 + (int)Native.GetLengthSid(sid);
+        var acl = Marshal.AllocHGlobal(aclSize);
+        try
+        {
+            if (!Native.InitializeAcl(acl, (uint)aclSize, 2) || !Native.AddMandatoryAce(acl, 2, 0x3, 0x1, sid))
+                return;
+            apply(acl);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(acl);
         }
     }
 
@@ -553,6 +737,62 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
         }
     }
 
+    private static string StartError(int error) => error switch
+    {
+        ErrorElevationRequired => "Windows asked for administrator approval, so the help query was not started.",
+        ErrorIllegalDllRelocation => "Windows refused to load this installer in the AppContainer because it has no relocation table. The low-integrity probe also failed. The installer was not run.",
+        _ => "The sandboxed help process could not be started (" + error + "). The installer was not run outside the sandbox."
+    };
+
+    private static bool LowerIntegrity(IntPtr process)
+    {
+        if (!Native.OpenProcessToken(process, TokenAdjustDefault | TokenQuery, out var token))
+            return false;
+        try
+        {
+            if (!Native.ConvertStringSidToSid("S-1-16-4096", out var sid))
+                return false;
+            try
+            {
+                var label = new Native.MandatoryLabel
+                {
+                    Sid = sid,
+                    Attributes = SeGroupIntegrity
+                };
+                var size = Marshal.SizeOf<Native.MandatoryLabel>();
+                var memory = Marshal.AllocHGlobal(size);
+                try
+                {
+                    Marshal.StructureToPtr(label, memory, false);
+                    return Native.SetTokenInformation(token, TokenIntegrityLevel, memory, (uint)size);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(memory);
+                }
+            }
+            finally
+            {
+                Native.LocalFree(sid);
+            }
+        }
+        finally
+        {
+            Native.CloseHandle(token);
+        }
+    }
+
+    private static Attempt CopyRelaxed(Attempt attempt) => new()
+    {
+        Text = attempt.Text,
+        Error = attempt.Error,
+        StartFailed = attempt.StartFailed,
+        StoppedInstaller = attempt.StoppedInstaller,
+        TimedOut = attempt.TimedOut,
+        Win32Error = attempt.Win32Error,
+        RelaxedSandbox = true
+    };
+
     private static string Decode(byte[] data)
     {
         if (data.Length == 0)
@@ -581,8 +821,10 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
         public bool StartFailed { get; init; }
         public bool StoppedInstaller { get; init; }
         public bool TimedOut { get; init; }
+        public bool RelaxedSandbox { get; init; }
+        public int Win32Error { get; init; }
 
-        public static Attempt Failed(string error) => new() { StartFailed = true, Error = error };
+        public static Attempt Failed(string error, int win32 = 0) => new() { StartFailed = true, Error = error, Win32Error = win32 };
     }
 
     private readonly record struct WindowScan(string Text, bool AnyWindow, bool OnUserDesktop);
@@ -639,6 +881,13 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        internal struct MandatoryLabel
+        {
+            public IntPtr Sid;
+            public uint Attributes;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal struct SecurityCapabilities
         {
             public IntPtr AppContainerSid;
@@ -690,6 +939,46 @@ public sealed class WindowsHelpQuery : IHelpQueryRunner
             public uint ControlFlags;
             public byte DscpTag;
         }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateProcessW", SetLastError = true)]
+        internal static extern bool CreateProcessSimple(
+            string application,
+            StringBuilder commandLine,
+            IntPtr processAttributes,
+            IntPtr threadAttributes,
+            bool inheritHandles,
+            uint flags,
+            IntPtr environment,
+            string? directory,
+            ref StartupInfo startup,
+            out ProcessInformation information);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool SetTokenInformation(IntPtr token, int informationClass, IntPtr information, uint length);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern bool ConvertStringSidToSid(string sid, out IntPtr sidPointer);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern uint GetLengthSid(IntPtr sid);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool InitializeAcl(IntPtr acl, uint length, uint revision);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool AddMandatoryAce(IntPtr acl, uint revision, uint flags, uint policy, IntPtr sid);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern uint SetNamedSecurityInfo(string name, uint objectType, uint securityInfo, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern uint SetSecurityInfo(IntPtr handle, uint objectType, uint securityInfo, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+
+        [DllImport("kernel32.dll")]
+        internal static extern IntPtr LocalFree(IntPtr memory);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         internal static extern bool CreateProcess(

@@ -15,6 +15,7 @@ public sealed class HelpQueryResult
     public string StandardError { get; init; } = "";
     public bool TimedOut { get; init; }
     public bool InstallerWasStopped { get; init; }
+    public bool RelaxedSandbox { get; init; }
     public int? ExitCode { get; init; }
     public string? Error { get; init; }
     public string Attempted { get; init; } = "";

@@ -99,7 +99,8 @@ public sealed class InstallerAnalyzer
             AlternateInstallDirectory = report.AlternateInstallDirectory,
             UninstallFileName = report.UninstallFileName,
             InstallDirectoryEmbedded = report.InstallDirectoryEmbedded,
-            InstallerWasStopped = result.InstallerWasStopped
+            InstallerWasStopped = result.InstallerWasStopped,
+            RelaxedSandbox = result.RelaxedSandbox
         };
     }
 

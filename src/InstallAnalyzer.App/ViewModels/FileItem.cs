@@ -147,15 +147,18 @@ public partial class FileItem : ObservableObject
 
     private static string HelpMessageFor(AnalysisReport report)
     {
+        var prefix = report.RelaxedSandbox
+            ? "This installer cannot run in the AppContainer, so the probe used low integrity and was stopped if it opened a window. "
+            : "";
         if (!string.IsNullOrWhiteSpace(report.HelpOutput) && report.InstallerWasStopped)
-            return "An earlier switch opened the installer and was stopped. Nothing was installed.";
+            return prefix + "An earlier switch opened the installer and was stopped. Nothing was installed.";
         if (report.InstallerWasStopped)
-            return "A help switch opened the installer. It was stopped immediately. Nothing was installed.";
+            return prefix + "A help switch opened the installer. It was stopped immediately. Nothing was installed.";
         if (report.HelpWasEmpty)
-            return "None of the help switches produced help text. The installer was not left running.";
+            return prefix + "None of the help switches produced help text. The installer was not left running.";
         if (report.HelpTimedOut)
-            return "The help process was stopped. Nothing was installed.";
-        return "";
+            return prefix + "The help process was stopped. Nothing was installed.";
+        return prefix.Trim();
     }
 
     private static string FormatSize(long size)
