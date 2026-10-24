@@ -11,32 +11,29 @@
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F4">
   <Grid>
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="22,18,22,16">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="18,14,18,12">
       <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Spacing="2">
-          <TextBlock Text="Install Analyzer" FontSize="22" FontWeight="SemiBold"/>
-          <TextBlock Text="Silent install and uninstall commands." Foreground="#78716C" FontSize="13"/>
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <TextBlock Text="Install Analyzer" FontSize="18" FontWeight="SemiBold"/>
+          <TextBlock Text="Silent install and uninstall commands." Foreground="#78716C" FontSize="12"/>
         </StackPanel>
-        <Button Grid.Column="1" Classes="quiet" Content="Browse" Command="{Binding BrowseCommand}" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Classes="add" Content="Add installer" Command="{Binding BrowseCommand}" VerticalAlignment="Center"/>
       </Grid>
 
-      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,14,0,0"
-                    IsVisible="{Binding HasSelection}">
-        <ItemsControl ItemsSource="{Binding Files}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="6"/>
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:FileItem">
-              <Button Classes="chip" Classes.selected="{Binding IsSelected}" Command="{Binding SelectCommand}">
-                <TextBlock Text="{Binding Name}"/>
-              </Button>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+      <ItemsControl Grid.Row="1" ItemsSource="{Binding Files}" Margin="0,10,0,0" IsVisible="{Binding HasSelection}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel Orientation="Horizontal"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FileItem">
+            <Button Classes="chip" Classes.selected="{Binding IsSelected}" Command="{Binding SelectCommand}" Margin="0,0,6,4">
+              <TextBlock Text="{Binding Name}"/>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
       <Panel Grid.Row="2" Margin="0,14,0,0">
         <Border IsVisible="{Binding ShowEmpty}" BorderBrush="#D6D3D1" BorderThickness="1.5" CornerRadius="14" Background="#FFFFFF"
@@ -49,77 +46,79 @@
         </Border>
 
         <Grid IsVisible="{Binding HasSelection}" RowDefinitions="Auto,*">
-          <StackPanel Spacing="10">
-            <StackPanel Spacing="2">
-              <TextBlock Text="{Binding Selected.ProductLine}" FontSize="20" FontWeight="SemiBold"/>
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="{Binding Selected.Publisher}" Foreground="#78716C" FontSize="13"/>
-                <TextBlock Text="{Binding Selected.Name}" Foreground="#78716C" FontSize="13"/>
-                <TextBlock Text="{Binding Selected.SizeText}" Foreground="#78716C" FontSize="13"/>
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Selected.ProductLine}" FontSize="18" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding Selected.Publisher}" Foreground="#78716C" FontSize="12"/>
+                  <TextBlock Text="{Binding Selected.Name}" Foreground="#78716C" FontSize="12"/>
+                  <TextBlock Text="{Binding Selected.SizeText}" Foreground="#78716C" FontSize="12"/>
+                </StackPanel>
               </StackPanel>
-            </StackPanel>
+              <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="2">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding Selected.FamilyText}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  <TextBlock Text="{Binding Selected.ConfidenceText}" Foreground="#78716C" FontSize="12" VerticalAlignment="Center"/>
+                  <Button Classes="quiet" Content="Query help" Command="{Binding AskHelpCommand}" IsVisible="{Binding Selected.CanQueryHelp}" Padding="8,3"/>
+                </StackPanel>
+                <TextBlock Text="{Binding Selected.Evidence}" Foreground="#78716C" FontSize="12" TextWrapping="Wrap" TextAlignment="Right" MaxWidth="420"/>
+              </StackPanel>
+            </Grid>
+            <TextBlock Text="{Binding Selected.HelpOutput}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" Foreground="#44403C" TextWrapping="Wrap"
+                       IsVisible="{Binding Selected.HasHelpOutput}"/>
+            <TextBlock Text="{Binding Selected.HelpMessage}" Foreground="#78716C" FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding Selected.HasHelpMessage}"/>
 
-            <Border Background="#1C1917" CornerRadius="12" Padding="14" IsVisible="{Binding Selected.HasInstall}">
-              <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                  <TextBlock Text="INSTALL" Foreground="#99F6E4" FontSize="11" FontWeight="Bold" LetterSpacing="1"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Selected.InstallConfidence}" Foreground="#A8A29E" FontSize="12" HorizontalAlignment="Right" Margin="0,0,8,0"/>
-                </Grid>
-                <TextBlock Text="{Binding Selected.InstallText}" FontFamily="Cascadia Code, Consolas, monospace" Foreground="#FAFAF9" FontSize="13" TextWrapping="Wrap"/>
-                <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border Background="#1C1917" CornerRadius="8" Padding="10,6" IsVisible="{Binding Selected.HasInstall}">
+              <Grid ColumnDefinitions="78,*,Auto">
+                <TextBlock Text="INSTALL" Foreground="#99F6E4" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Selected.InstallText}" FontFamily="Cascadia Code, Consolas, monospace" Foreground="#FAFAF9" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0,0,0">
                   <Button Classes="ghost" Content="Copy" Command="{Binding CopyInstallCommand}"/>
                   <Button Classes="ghost" Content="Copy with log" Command="{Binding CopyInstallLogCommand}" IsVisible="{Binding Selected.HasInstallLog}"/>
                 </StackPanel>
-              </StackPanel>
+              </Grid>
             </Border>
             <TextBlock Text="{Binding Selected.InstallNote}" Foreground="#78716C" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Selected.HasInstall}"/>
 
-            <Border Background="#1C1917" CornerRadius="12" Padding="14" IsVisible="{Binding Selected.HasUninstall}">
-              <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*">
-                  <TextBlock Text="UNINSTALL" Foreground="#99F6E4" FontSize="11" FontWeight="Bold" LetterSpacing="1"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Selected.UninstallConfidence}" Foreground="#A8A29E" FontSize="12" HorizontalAlignment="Right"/>
-                </Grid>
-                <TextBlock Text="{Binding Selected.UninstallText}" FontFamily="Cascadia Code, Consolas, monospace" Foreground="#FAFAF9" FontSize="13" TextWrapping="Wrap"/>
-                <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border Background="#1C1917" CornerRadius="8" Padding="10,6" IsVisible="{Binding Selected.HasUninstall}">
+              <Grid ColumnDefinitions="78,*,Auto">
+                <TextBlock Text="UNINSTALL" Foreground="#99F6E4" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Selected.UninstallText}" FontFamily="Cascadia Code, Consolas, monospace" Foreground="#FAFAF9" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0,0,0">
                   <Button Classes="ghost" Content="Copy" Command="{Binding CopyUninstallCommand}"/>
                   <Button Classes="ghost" Content="Copy with log" Command="{Binding CopyUninstallLogCommand}" IsVisible="{Binding Selected.HasUninstallLog}"/>
                 </StackPanel>
-              </StackPanel>
+              </Grid>
             </Border>
             <TextBlock Text="{Binding Selected.UninstallNote}" Foreground="#78716C" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Selected.HasUninstall}"/>
 
-            <Border Background="#FFF7ED" CornerRadius="12" Padding="12,10" IsVisible="{Binding Selected.HasAdvisory}">
-              <TextBlock Text="{Binding Selected.Advisory}" Foreground="#9A3412" FontSize="13" TextWrapping="Wrap"/>
+            <Border Background="#FFF7ED" CornerRadius="8" Padding="10,6" IsVisible="{Binding Selected.HasAdvisory}">
+              <TextBlock Text="{Binding Selected.Advisory}" Foreground="#9A3412" FontSize="12" TextWrapping="Wrap"/>
             </Border>
           </StackPanel>
 
-          <ScrollViewer Grid.Row="1" Margin="0,16,0,0">
-            <StackPanel Spacing="12">
-              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="14" Padding="14,12">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="DETECTION" Foreground="#78716C" FontSize="11" FontWeight="Bold" LetterSpacing="1"/>
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Border Background="#F0FDFA" CornerRadius="999" Padding="8,3">
-                      <TextBlock Text="{Binding Selected.FamilyText}" Foreground="#115E59" FontSize="12" FontWeight="SemiBold"/>
-                    </Border>
-                    <TextBlock Text="{Binding Selected.ConfidenceText}" Foreground="#78716C" FontSize="13" VerticalAlignment="Center"/>
-                  </StackPanel>
-                  <TextBlock Text="{Binding Selected.Evidence}" Foreground="#78716C" FontSize="13" TextWrapping="Wrap"/>
-                </StackPanel>
-              </Border>
-
-              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="14" Padding="14,12"
+          <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
+            <StackPanel Spacing="10">
+              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="10" Padding="12,8"
                       IsVisible="{Binding Selected.HasSwitches}">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="SWITCHES" Foreground="#78716C" FontSize="11" FontWeight="Bold" LetterSpacing="1" Margin="0,0,0,4"/>
+                <StackPanel Spacing="0">
+                  <TextBlock Text="SWITCHES" Foreground="#78716C" FontSize="11" FontWeight="Bold" LetterSpacing="1" Margin="0,0,0,6"/>
+                  <Border BorderBrush="#E7E5E4" BorderThickness="0,0,0,1" Padding="0,0,0,4" Margin="0,0,0,2">
+                    <Grid ColumnDefinitions="168,*,120">
+                      <TextBlock Text="Switch" Foreground="#A8A29E" FontSize="11" FontWeight="SemiBold"/>
+                      <TextBlock Grid.Column="1" Text="Description" Foreground="#A8A29E" FontSize="11" FontWeight="SemiBold"/>
+                      <TextBlock Grid.Column="2" Text="From" Foreground="#A8A29E" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                    </Grid>
+                  </Border>
                   <ItemsControl ItemsSource="{Binding Selected.Switches}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:SwitchRow">
-                        <Grid ColumnDefinitions="190,*,120" Margin="0,6">
-                          <TextBlock Text="{Binding Flag}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Meaning}" FontSize="13" TextWrapping="Wrap"/>
-                          <TextBlock Grid.Column="2" Text="{Binding Source}" Foreground="#78716C" FontSize="12" HorizontalAlignment="Right"/>
+                        <Grid ColumnDefinitions="168,*,120" Margin="0,3">
+                          <TextBlock Text="{Binding Flag}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Meaning}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="2" Text="{Binding Source}" Foreground="#78716C" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -127,7 +126,7 @@
                 </StackPanel>
               </Border>
 
-              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="14" Padding="14,12"
+              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="10" Padding="12,8"
                       IsVisible="{Binding Selected.HasPayloads}">
                 <StackPanel Spacing="4">
                   <TextBlock Text="EMBEDDED" Foreground="#78716C" FontSize="11" FontWeight="Bold" LetterSpacing="1" Margin="0,0,0,4"/>
@@ -145,17 +144,6 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                </StackPanel>
-              </Border>
-
-              <Border Background="#FFFFFF" BorderBrush="#E7E5E4" BorderThickness="1" CornerRadius="14" Padding="14,12">
-                <StackPanel Spacing="8">
-                  <TextBlock Text="HELP" Foreground="#78716C" FontSize="11" FontWeight="Bold" LetterSpacing="1"/>
-                  <TextBlock Text="{Binding Selected.HelpOutput}" FontFamily="Cascadia Code, Consolas, monospace" FontSize="12" TextWrapping="Wrap"
-                             IsVisible="{Binding Selected.HasHelpOutput}"/>
-                  <TextBlock Text="{Binding Selected.HelpMessage}" Foreground="#78716C" FontSize="13" TextWrapping="Wrap"
-                             IsVisible="{Binding Selected.HasHelpMessage}"/>
-                  <Button Classes="quiet" Content="Query help" Command="{Binding AskHelpCommand}" IsVisible="{Binding Selected.CanQueryHelp}" HorizontalAlignment="Left"/>
                 </StackPanel>
               </Border>
             </StackPanel>

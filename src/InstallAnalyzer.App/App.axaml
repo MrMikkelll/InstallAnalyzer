@@ -9,6 +9,18 @@
       <Setter Property="Background" Value="#F5F5F4"/>
       <Setter Property="Foreground" Value="#1C1917"/>
     </Style>
+    <Style Selector="Button.add">
+      <Setter Property="Background" Value="#0F766E"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="16,9"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.add:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#0D9488"/>
+    </Style>
     <Style Selector="Button.quiet">
       <Setter Property="Background" Value="#FFFFFF"/>
       <Setter Property="Foreground" Value="#1C1917"/>
@@ -26,8 +38,8 @@
       <Setter Property="Foreground" Value="#FAFAF9"/>
       <Setter Property="BorderBrush" Value="#33FFFFFF"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="Padding" Value="10,6"/>
-      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="8,3"/>
+      <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
@@ -37,9 +49,9 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="#1C1917"/>
       <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Padding" Value="10,8"/>
-      <Setter Property="CornerRadius" Value="10"/>
-      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style Selector="Button.chip.selected">
       <Setter Property="Background" Value="#FFFFFF"/>

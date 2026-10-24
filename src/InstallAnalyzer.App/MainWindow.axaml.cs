@@ -54,7 +54,7 @@ public sealed class WindowUserIO : IUserIO
     {
         var files = await _window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Choose installers",
+            Title = "Add installer",
             AllowMultiple = true,
             FileTypeFilter =
             [
