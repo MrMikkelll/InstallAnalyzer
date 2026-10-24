@@ -69,7 +69,11 @@ public sealed class InstallerAnalyzer
             InstallDirectory = report.InstallDirectory,
             AlternateInstallDirectory = report.AlternateInstallDirectory,
             UninstallFileName = report.UninstallFileName,
-            InstallDirectoryEmbedded = report.InstallDirectoryEmbedded
+            InstallDirectoryEmbedded = report.InstallDirectoryEmbedded,
+            SevenZipApplication = report.SevenZipApplication,
+            SumatraInstaller = report.SumatraInstaller,
+            FirefoxPackage = report.FirefoxPackage,
+            ProductName = report.File.ProductName
         });
 
         var empty = string.IsNullOrWhiteSpace(output) && string.IsNullOrWhiteSpace(result.Error);
@@ -100,7 +104,10 @@ public sealed class InstallerAnalyzer
             UninstallFileName = report.UninstallFileName,
             InstallDirectoryEmbedded = report.InstallDirectoryEmbedded,
             InstallerWasStopped = result.InstallerWasStopped,
-            RelaxedSandbox = result.RelaxedSandbox
+            RelaxedSandbox = result.RelaxedSandbox,
+            SevenZipApplication = report.SevenZipApplication,
+            SumatraInstaller = report.SumatraInstaller,
+            FirefoxPackage = report.FirefoxPackage
         };
     }
 
@@ -163,7 +170,8 @@ public sealed class InstallerAnalyzer
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            location = InstallLocationFinder.Find(stream, inspection.Family, identity.ProductName, inspection.Is64Bit);
+            var bitness = inspection.Prefer64BitInstall ? true : inspection.Is64Bit;
+            location = InstallLocationFinder.Find(stream, inspection.Family, identity.ProductName, bitness);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -183,7 +191,11 @@ public sealed class InstallerAnalyzer
             InstallDirectory = location.Directory,
             AlternateInstallDirectory = location.AlternateDirectory,
             UninstallFileName = location.UninstallFileName,
-            InstallDirectoryEmbedded = location.Embedded
+            InstallDirectoryEmbedded = location.Embedded,
+            SevenZipApplication = inspection.SevenZipApplication,
+            SumatraInstaller = inspection.SumatraInstaller,
+            FirefoxPackage = inspection.FirefoxPackage,
+            ProductName = identity.ProductName
         });
 
         return new AnalysisReport
@@ -207,7 +219,10 @@ public sealed class InstallerAnalyzer
             InstallDirectory = location.Directory,
             AlternateInstallDirectory = location.AlternateDirectory,
             UninstallFileName = location.UninstallFileName,
-            InstallDirectoryEmbedded = location.Embedded
+            InstallDirectoryEmbedded = location.Embedded,
+            SevenZipApplication = inspection.SevenZipApplication,
+            SumatraInstaller = inspection.SumatraInstaller,
+            FirefoxPackage = inspection.FirefoxPackage
         };
     }
 

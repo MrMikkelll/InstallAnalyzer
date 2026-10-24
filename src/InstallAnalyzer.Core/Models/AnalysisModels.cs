@@ -154,4 +154,7 @@ public sealed class AnalysisReport
     public bool InstallDirectoryEmbedded { get; init; }
     public bool InstallerWasStopped { get; init; }
     public bool RelaxedSandbox { get; init; }
+    public bool SevenZipApplication { get; init; }
+    public bool SumatraInstaller { get; init; }
+    public bool FirefoxPackage { get; init; }
 }

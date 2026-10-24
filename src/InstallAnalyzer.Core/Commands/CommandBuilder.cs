@@ -15,6 +15,10 @@ public sealed class CommandInput
     public string? AlternateInstallDirectory { get; init; }
     public string? UninstallFileName { get; init; }
     public bool InstallDirectoryEmbedded { get; init; }
+    public bool SevenZipApplication { get; init; }
+    public bool SumatraInstaller { get; init; }
+    public bool FirefoxPackage { get; init; }
+    public string? ProductName { get; init; }
 }
 
 public sealed class CommandPlan
@@ -120,7 +124,19 @@ public static class CommandBuilder
                 break;
             case InstallerFamily.SevenZipSfx:
                 install = Make("Install", $"{file} /S", null, confidence, "/D=C:\\Path sets the output directory. It must be last and it is not quoted. This extracts files; it may not be a full installer.");
-                advisory = "7-Zip SFX modules usually have no uninstaller.";
+                if (input.FirefoxPackage)
+                {
+                    uninstall = Make("Uninstall", $"{CommandLineText.Quote(@"C:\Program Files\Mozilla Firefox\uninstall\helper.exe")} /S", null, Confidence.Medium, "Firefox removes itself through helper.exe in the install folder.");
+                }
+                else if (input.SevenZipApplication)
+                {
+                    var sevenZip = input.InstallDirectory ?? @"C:\Program Files\7-Zip";
+                    uninstall = Make("Uninstall", $"{CommandLineText.Quote(CommandLineText.WindowsCombine(sevenZip, "Uninstall.exe"))} /S", null, confidence, "7-Zip registers Uninstall.exe in its install folder.");
+                }
+                else
+                {
+                    advisory = "7-Zip SFX modules usually have no uninstaller.";
+                }
                 AddBuiltIn(switches, install, ("/S", "Silent extract."), ("/D=", "Output directory. Must be last and unquoted."));
                 break;
             case InstallerFamily.IExpress:
@@ -129,7 +145,22 @@ public static class CommandBuilder
                 AddBuiltIn(switches, install, ("/Q", "Suppress prompts."), ("/T", "Extract to a folder."), ("/C", "Run a command after extract."));
                 break;
             default:
-                advisory = "No reliable silent command was found for this file. Query help tries help switches in a sandbox and does not install the file.";
+                if (input.SevenZipApplication || input.ProductName?.StartsWith("7-Zip", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    install = Make("Install", $"{file} /S", null, Confidence.Medium, "The 7-Zip installer accepts /S.");
+                    var sevenZip = input.InstallDirectory ?? @"C:\Program Files\7-Zip";
+                    uninstall = Make("Uninstall", $"{CommandLineText.Quote(CommandLineText.WindowsCombine(sevenZip, "Uninstall.exe"))} /S", null, Confidence.Medium, "7-Zip registers Uninstall.exe in its install folder.");
+                    AddBuiltIn(switches, install, ("/S", "Silent install."));
+                }
+                else if (input.SumatraInstaller)
+                {
+                    install = Make("Install", $"{file} -s", null, Confidence.High, "SumatraPDF installs quietly with -s.");
+                    uninstall = Make("Uninstall", $"{CommandLineText.Quote(@"C:\Program Files\SumatraPDF\uninstall.exe")} /s", null, Confidence.Medium, "The uninstaller accepts /s.");
+                }
+                else
+                {
+                    advisory = "No reliable silent command was found for this file. Query help tries help switches in a sandbox and does not install the file.";
+                }
                 break;
         }
 

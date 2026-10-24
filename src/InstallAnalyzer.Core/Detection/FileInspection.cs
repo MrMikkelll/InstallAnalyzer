@@ -14,6 +14,10 @@ public sealed class FileInspection
     public bool InstallShieldMsiEngine { get; init; }
     public bool IsPortableExecutable { get; init; }
     public bool? Is64Bit { get; init; }
+    public bool Prefer64BitInstall { get; init; }
+    public bool SevenZipApplication { get; init; }
+    public bool SumatraInstaller { get; init; }
+    public bool FirefoxPackage { get; init; }
     public MsixFacts? Msix { get; init; }
     public IReadOnlyList<BurnContainerSlice> BurnContainers { get; init; } = [];
     public IReadOnlyList<long> OleOffsets { get; init; } = [];

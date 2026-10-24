@@ -119,6 +119,51 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public void Recognizes_the_7zip_application_installer()
+    {
+        using var dir = new TempDir();
+        var path = dir.Write("7zip.exe", Prefix("7-Zip Shell Extension"));
+        var report = new InstallerAnalyzer().Analyze(path);
+        Assert.Equal(InstallerFamily.SevenZipSfx, report.Family);
+        Assert.Contains("/S", report.Install!.Text);
+        Assert.Contains(@"C:\Program Files\7-Zip\Uninstall.exe", report.Uninstall!.Text);
+    }
+
+    [Fact]
+    public void Product_name_7zip_gets_silent_commands_without_a_family_signature()
+    {
+        var plan = CommandBuilder.Build(new CommandInput
+        {
+            FilePath = @"C:\Installers\7zip.exe",
+            Family = InstallerFamily.Unknown,
+            Confidence = Confidence.None,
+            ProductName = "7-Zip"
+        });
+        Assert.Contains("/S", plan.Install!.Text);
+        Assert.Contains(@"C:\Program Files\7-Zip\Uninstall.exe", plan.Uninstall!.Text);
+    }
+
+    [Fact]
+    public void Recognizes_sumatra_silent_switches()
+    {
+        using var dir = new TempDir();
+        var path = dir.Write("sumatra.exe", Prefix("SumatraPDF uninstall.exe [/s]"));
+        var report = new InstallerAnalyzer().Analyze(path);
+        Assert.Contains("-s", report.Install!.Text);
+        Assert.Contains(@"SumatraPDF\uninstall.exe", report.Uninstall!.Text);
+    }
+
+    [Fact]
+    public void Firefox_sfx_uses_the_helper_uninstaller()
+    {
+        using var dir = new TempDir();
+        var path = dir.Write("firefox.exe", Prefix(";!@Install@!UTF-8! Title=\"Mozilla Firefox\""));
+        var report = new InstallerAnalyzer().Analyze(path);
+        Assert.Equal(InstallerFamily.SevenZipSfx, report.Family);
+        Assert.Contains(@"Mozilla Firefox\uninstall\helper.exe", report.Uninstall!.Text);
+    }
+
+    [Fact]
     public void Unknown_file_has_no_silent_command()
     {
         using var dir = new TempDir();
