@@ -1,0 +1,55 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="InstallAnalyzer.App.App"
+             RequestedThemeVariant="Light">
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="Inter, Segoe UI, sans-serif"/>
+      <Setter Property="Background" Value="#F5F5F4"/>
+      <Setter Property="Foreground" Value="#1C1917"/>
+    </Style>
+    <Style Selector="Button.quiet">
+      <Setter Property="Background" Value="#FFFFFF"/>
+      <Setter Property="Foreground" Value="#1C1917"/>
+      <Setter Property="BorderBrush" Value="#E7E5E4"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,6"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="Button.quiet:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#FAFAF9"/>
+    </Style>
+    <Style Selector="Button.ghost">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="#FAFAF9"/>
+      <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,6"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#14FFFFFF"/>
+    </Style>
+    <Style Selector="Button.chip">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="#1C1917"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="10,8"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="Button.chip.selected">
+      <Setter Property="Background" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#0F766E"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+  </Application.Styles>
+</Application>

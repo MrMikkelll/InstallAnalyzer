@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Analyzer — layout chooser</title>
+<style>
+  :root {
+    --bg: #e7e5e4;
+    --ink: #1c1917;
+    --muted: #78716c;
+    --line: #e7e5e4;
+    --card: #ffffff;
+    --soft: #fafaf9;
+    --accent: #0f766e;
+    --accent-ink: #115e59;
+    --accent-soft: #f0fdfa;
+    --code: #1c1917;
+    --code-ink: #fafaf9;
+    --mint: #99f6e4;
+    --warn: #fff7ed;
+    --warn-ink: #9a3412;
+    --shadow: 0 24px 60px rgba(28, 25, 23, 0.12);
+    --sans: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "Cascadia Code", "Segoe UI Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 400px at 10% -10%, #f5f5f4 0%, transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    letter-spacing: -0.011em;
+  }
+  header.page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 36px 24px 8px;
+  }
+  header.page h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  header.page p.lead {
+    margin: 8px 0 0;
+    max-width: 640px;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .chooser {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 20px 24px 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .chooser button.tab {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .chooser button.tab[aria-pressed="true"] {
+    background: var(--ink);
+    color: white;
+  }
+  .chooser button.tab:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .badge {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 2px 6px;
+    vertical-align: 1px;
+  }
+  .chooser button.tab[aria-pressed="true"] .badge {
+    background: rgba(255,255,255,0.16);
+    color: var(--mint);
+  }
+  .states {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.7);
+    padding: 4px;
+    border-radius: 999px;
+  }
+  .states button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .states button[aria-pressed="true"] {
+    background: white;
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .stage {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 12px 24px 28px;
+  }
+  .window {
+    height: 720px;
+    background: #f5f5f4;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255,255,255,0.8);
+  }
+  .chrome {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    background: #fafaf9;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i {
+    width: 10px; height: 10px; border-radius: 50%; display: block;
+    background: #d6d3d1;
+  }
+  .chrome strong { color: var(--ink); font-weight: 600; margin-left: 6px; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .scroll { flex: 1; min-height: 0; overflow: auto; }
+  button.mini, button.copy {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    border-radius: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  button.copy.ghost {
+    background: transparent;
+    color: var(--code-ink);
+    border-color: rgba(255,255,255,0.18);
+  }
+  button.copy.ghost:hover { background: rgba(255,255,255,0.06); }
+  .drop {
+    border: 1.5px dashed #d6d3d1;
+    border-radius: 14px;
+    background: white;
+    color: var(--muted);
+    text-align: center;
+    padding: 28px 16px;
+  }
+  .drop strong { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; }
+  .drop.hero { margin: auto; max-width: 460px; padding: 54px 28px; }
+  .filechip {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+  }
+  .filechip b { color: var(--ink); font-weight: 600; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 14px;
+    color: var(--muted); font-size: 13px; margin-top: 6px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-soft); color: var(--accent-ink);
+    border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 600;
+  }
+  h2.product { margin: 0; font-size: 26px; letter-spacing: -0.03em; font-weight: 650; }
+  .cmd {
+    background: var(--code);
+    color: var(--code-ink);
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+  }
+  .cmd .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cmd .kicker {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--mint); font-weight: 700;
+  }
+  .cmd .conf { margin-left: auto; color: #a8a29e; font-size: 12px; }
+  .cmd pre {
+    margin: 0; font-family: var(--mono); font-size: 13px; line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .cmd .actions { display: flex; gap: 6px; margin-top: 10px; }
+  .note { margin: 8px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .card {
+    background: white; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  .switch {
+    display: grid; grid-template-columns: 180px 1fr auto; gap: 8px;
+    padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px;
+  }
+  .switch code { font-family: var(--mono); font-size: 12px; }
+  .src { color: var(--muted); font-size: 12px; }
+  .advisory {
+    background: var(--warn); color: var(--warn-ink);
+    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.45;
+  }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .work { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px 1fr; }
+  .files { border-right: 1px solid var(--line); background: #fafaf9; padding: 12px; overflow: auto; }
+  .files button.file {
+    width: 100%; text-align: left; border: 0; background: transparent;
+    font: inherit; padding: 10px; border-radius: 10px; cursor: pointer; color: var(--ink);
+  }
+  .files button.file small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .files button.file[aria-pressed="true"] { background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .pad { padding: 22px 26px 28px; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .deck-top { padding: 18px 22px 8px; display: flex; flex-direction: column; gap: 10px; }
+  .quiet { padding: 8px 22px 24px; }
+  .inspector { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.1fr 0.9fr; }
+  .check {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px;
+  }
+  .check input { margin-top: 3px; accent-color: var(--accent); }
+  .check small { display: block; color: var(--muted); font-weight: 400; }
+  footer.page {
+    max-width: 1180px; margin: 0 auto; padding: 0 24px 40px;
+    color: var(--muted); font-size: 13px; line-height: 1.5;
+  }
+  .payload { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding-top: 8px; }
+  .payload code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  @media (max-width: 900px) {
+    .states { margin-left: 0; }
+    .window { height: auto; min-height: 720px; }
+    .work, .inspector, .cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Choose a layout</h1>
+  <p class="lead">Four ways to show the same installer analysis. The desktop app is built from Command deck. Use the other three to compare. Switch the sample between a result, an unknown file, and an empty window.</p>
+</header>
+<div class="chooser">
+  <button class="tab" type="button" data-layout="report" aria-pressed="false">Report</button>
+  <button class="tab" type="button" data-layout="workbench" aria-pressed="false">Workbench</button>
+  <button class="tab" type="button" data-layout="deck" aria-pressed="true">Command deck <span class="badge">Recommended</span></button>
+  <button class="tab" type="button" data-layout="inspector" aria-pressed="false">Inspector</button>
+  <div class="states" role="group" aria-label="Sample state">
+    <button type="button" data-state="result" aria-pressed="true">Result</button>
+    <button type="button" data-state="unknown" aria-pressed="false">Unknown</button>
+    <button type="button" data-state="empty" aria-pressed="false">Empty</button>
+  </div>
+</div>
+<div class="stage">
+  <div class="window">
+    <div class="chrome"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><strong>Install Analyzer</strong></div>
+    <div class="body" id="app"></div>
+  </div>
+</div>
+<footer class="page" id="blurb"></footer>
+<script>
+const layouts = {
+  report: "One calm column. The file becomes a short document: product, two command cards, then the evidence.",
+  workbench: "A file list on the left and the report on the right. Better when you drop several installers.",
+  deck: "The install and uninstall commands sit at the top in monospace. Evidence stays underneath.",
+  inspector: "Each switch is a row you can include or drop. The command on the right updates as you toggle."
+};
+
+const northwind = {
+  name: "Northwind Setup.exe",
+  size: "48.2 MB",
+  product: "Northwind Desktop",
+  version: "2.4.1",
+  publisher: "Northwind Labs",
+  family: "Inno Setup",
+  confidence: "High",
+  evidence: "Found the Inno Setup data header near the end of the file.",
+  install: "\"C:\\Installers\\Northwind Setup.exe\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
+  installLog: "\"C:\\Installers\\Northwind Setup.exe\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=\"%TEMP%\\InstallAnalyzer\\install.log\"",
+  uninstall: "\"C:\\Program Files\\Northwind Desktop\\unins000.exe\" /VERYSILENT /NORESTART",
+  installNote: "Reboot prompts are suppressed. The uninstaller path is created at install time. Try this in a VM.",
+  uninstallNote: "unins000.exe is written into the install directory. Try this in a VM.",
+  switches: [
+    { flag: "/VERYSILENT", meaning: "No wizard and no progress window.", source: "Inno Setup", on: true },
+    { flag: "/SUPPRESSMSGBOXES", meaning: "Answer message boxes with the default.", source: "Inno Setup", on: true },
+    { flag: "/NORESTART", meaning: "Do not reboot when the setup finishes.", source: "Inno Setup", on: true },
+    { flag: "/LOG", meaning: "Write an install log.", source: "Inno Setup", on: false },
+    { flag: "/DIR", meaning: "Override the install directory.", source: "Inno Setup", on: false },
+    { flag: "/TASKS", meaning: "Choose which tasks to run.", source: "Inno Setup", on: false }
+  ],
+  payload: "NorthwindDesktop.msi",
+  payloadDetail: "Windows Installer · {4F2A9C1E-7B33-4D18-9A60-1C8E5D27AA01}",
+  help: "/VERYSILENT, /SUPPRESSMSGBOXES, /NORESTART, /DIR=\"path\", /LOG=\"file\""
+};
+
+const files = [
+  { id: "nw", label: "Northwind Setup.exe", detail: "Inno Setup · High", kind: "result" },
+  { id: "msi", label: "LegacyTool.msi", detail: "Windows Installer · High", kind: "msi" },
+  { id: "unk", label: "VendorSetup.exe", detail: "Unknown · None", kind: "unknown" }
+];
+
+const state = { layout: "deck", mode: "result", fileId: "nw", switches: northwind.switches.map(s => ({...s})) };
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function copyBtn(text, ghost) {
+  return `<button type="button" class="copy${ghost ? " ghost" : ""}" data-copy="${esc(text)}">Copy</button>`;
+}
+
+function commandCard(kicker, text, note, confidence, logText) {
+  const log = logText || text;
+  const logBtn = log === text ? "" : `<button type="button" class="copy ghost" data-copy="${esc(log)}">Copy with log</button>`;
+  return `<section class="cmd">
+    <div class="top"><span class="kicker">${kicker}</span><span class="conf">${confidence}</span></div>
+    <pre>${esc(text)}</pre>
+    <div class="actions">${copyBtn(text, true)}${logBtn}</div>
+  </section>
+  <p class="note">${esc(note)}</p>`;
+}
+
+function unknownBlock() {
+  return `<div class="advisory">No reliable silent command for this file. Query help only if you trust it. A few installers ignore the help switch and start installing.</div>
+    <div class="card"><h3>Detection</h3><div class="meta"><span>VendorSetup.exe</span><span>12.4 MB</span><span class="pill">Unknown</span></div>
+    <p class="note">No installer family signature was found.</p></div>`;
+}
+
+function emptyBlock(hero) {
+  return `<div class="drop ${hero ? "hero" : ""}"><strong>Drop an installer</strong>MSI, EXE, MSIX, or MSP. Nothing is installed. You get a command to copy.</div>`;
+}
+
+function evidence() {
+  return `<div class="cols">
+    <section class="card"><h3>Detection</h3>
+      <div class="meta"><span class="pill">${esc(northwind.family)}</span><span>${esc(northwind.confidence)} confidence</span></div>
+      <p class="note">${esc(northwind.evidence)}</p>
+    </section>
+    <section class="card"><h3>Embedded</h3>
+      <div class="payload"><div><b>${esc(northwind.payload)}</b><br><span class="src">${esc(northwind.payloadDetail)}</span></div></div>
+    </section>
+  </div>
+  <section class="card"><h3>Switches</h3>
+    ${northwind.switches.map(s => `<div class="switch"><code>${esc(s.flag)}</code><span>${esc(s.meaning)}</span><span class="src">${esc(s.source)}</span></div>`).join("")}
+  </section>
+  <section class="card"><h3>Help text</h3><p class="note" style="margin:0">${esc(northwind.help)}</p></section>`;
+}
+
+function reportColumn(showDrop) {
+  if (state.mode === "empty") return emptyBlock(true);
+  if (state.mode === "unknown") {
+    return `<div class="stack">${showDrop ? `<div class="filechip"><b>VendorSetup.exe</b><span>12.4 MB</span></div>` : ""}<h2 class="product">Vendor setup</h2>${unknownBlock()}</div>`;
+  }
+  return `<div class="stack">
+    <div class="filechip"><b>${esc(northwind.name)}</b><span>${esc(northwind.size)}</span><button type="button" class="mini">Browse</button></div>
+    <div><h2 class="product">${esc(northwind.product)} ${esc(northwind.version)}</h2>
+      <div class="meta"><span>${esc(northwind.publisher)}</span><span class="pill">${esc(northwind.family)}</span><span>${esc(northwind.confidence)}</span></div>
+    </div>
+    ${commandCard("Install", northwind.install, northwind.installNote, "High", northwind.installLog)}
+    ${commandCard("Uninstall", northwind.uninstall, northwind.uninstallNote, "High")}
+    ${evidence()}
+  </div>`;
+}
+
+function renderReport() {
+  return `<div class="scroll"><div class="pad" style="max-width:760px;margin:0 auto">${reportColumn(true)}</div></div>`;
+}
+
+function renderWorkbench() {
+  const list = files.map(f => `<button type="button" class="file" data-file="${f.id}" aria-pressed="${state.fileId === f.id}"><b>${esc(f.label)}</b><small>${esc(f.detail)}</small></button>`).join("");
+  let detail;
+  const selected = files.find(f => f.id === state.fileId);
+  if (state.mode === "empty") detail = emptyBlock(true);
+  else if (state.mode === "unknown" || selected.kind === "unknown") detail = `<div class="stack"><h2 class="product">Vendor setup</h2>${unknownBlock()}</div>`;
+  else if (selected.kind === "msi") {
+    detail = `<div class="stack"><h2 class="product">Legacy Tool 1.0.3</h2>
+      <div class="meta"><span>Contoso</span><span class="pill">Windows Installer</span><span>High</span></div>
+      ${commandCard("Install", "msiexec /i \"C:\\Installers\\LegacyTool.msi\" /qn /norestart", "Reboot prompts are suppressed. Try this in a VM.", "High", "msiexec /i \"C:\\Installers\\LegacyTool.msi\" /qn /norestart /l*v \"%TEMP%\\InstallAnalyzer\\install.log\"")}
+      ${commandCard("Uninstall", "msiexec /x {9C2E4A10-55B1-4E0A-9F22-0A6B7C8D9E01} /qn /norestart", "Uses the product code from the MSI. Try this in a VM.", "High", "msiexec /x {9C2E4A10-55B1-4E0A-9F22-0A6B7C8D9E01} /qn /norestart /l*v \"%TEMP%\\InstallAnalyzer\\uninstall.log\"")}
+    </div>`;
+  } else detail = reportColumn(false);
+  return `<div class="work"><div class="files">${list}</div><div class="scroll"><div class="pad">${detail}</div></div></div>`;
+}
+
+function renderDeck() {
+  if (state.mode === "empty") return `<div class="scroll"><div class="pad">${emptyBlock(true)}</div></div>`;
+  if (state.mode === "unknown") {
+    return `<div class="scroll"><div class="pad stack"><div class="filechip"><b>VendorSetup.exe</b><span>12.4 MB</span></div>${unknownBlock()}</div></div>`;
+  }
+  return `<div class="scroll">
+    <div class="deck-top">
+      <div class="filechip"><b>${esc(northwind.name)}</b><span>${esc(northwind.product)} ${esc(northwind.version)} · ${esc(northwind.publisher)}</span><span style="margin-left:auto"><button type="button" class="mini">Browse</button></span></div>
+      ${commandCard("Install", northwind.install, northwind.installNote, "High confidence", northwind.installLog)}
+      ${commandCard("Uninstall", northwind.uninstall, northwind.uninstallNote, "High confidence")}
+    </div>
+    <div class="quiet stack">${evidence()}</div>
+  </div>`;
+}
+
+function renderInspector() {
+  if (state.mode === "empty") return `<div class="scroll"><div class="pad">${emptyBlock(true)}</div></div>`;
+  if (state.mode === "unknown") return `<div class="scroll"><div class="pad stack">${unknownBlock()}</div></div>`;
+  const base = "\"C:\\\\Installers\\\\Northwind Setup.exe\"";
+  const selected = state.switches.filter(s => s.on && s.flag !== "/LOG" && s.flag !== "/DIR" && s.flag !== "/TASKS").map(s => s.flag);
+  const extras = state.switches.filter(s => s.on && (s.flag === "/DIR" || s.flag === "/TASKS")).map(s => s.flag === "/DIR" ? "/DIR=\"C:\\Program Files\\Northwind Desktop\"" : "/TASKS=\"desktopicon\"");
+  const cmd = [base, ...selected, ...extras].join(" ");
+  const logOn = state.switches.some(s => s.flag === "/LOG" && s.on);
+  const logCmd = logOn ? cmd + " /LOG=\"%TEMP%\\InstallAnalyzer\\install.log\"" : cmd;
+  const rows = state.switches.map((s, i) => `<label class="check"><input type="checkbox" data-switch="${i}" ${s.on ? "checked" : ""}><span><b><code>${esc(s.flag)}</code></b><small>${esc(s.meaning)} · ${esc(s.source)}</small></span></label>`).join("");
+  return `<div class="inspector">
+    <div class="scroll"><div class="pad"><h2 class="product" style="font-size:20px">Switches</h2><p class="note">Included switches are copied into the command.</p>${rows}</div></div>
+    <div class="scroll" style="background:#fafaf9;border-left:1px solid var(--line)"><div class="pad stack">
+      <div class="meta"><span class="pill">${esc(northwind.family)}</span><span>${esc(northwind.confidence)}</span></div>
+      ${commandCard("Install", cmd, northwind.installNote, "High", logOn ? logCmd : undefined)}
+      ${commandCard("Uninstall", northwind.uninstall, northwind.uninstallNote, "High")}
+    </div></div>
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById("app");
+  const html = { report: renderReport, workbench: renderWorkbench, deck: renderDeck, inspector: renderInspector }[state.layout]();
+  root.innerHTML = html;
+  document.getElementById("blurb").textContent = layouts[state.layout];
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-pressed", b.dataset.layout === state.layout ? "true" : "false"));
+  document.querySelectorAll(".states button").forEach(b => b.setAttribute("aria-pressed", b.dataset.state === state.mode ? "true" : "false"));
+}
+
+document.querySelector(".chooser").addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  const st = e.target.closest(".states button");
+  if (tab) { state.layout = tab.dataset.layout; render(); }
+  if (st) { state.mode = st.dataset.state; render(); }
+});
+
+document.getElementById("app").addEventListener("click", async e => {
+  const copy = e.target.closest("[data-copy]");
+  const file = e.target.closest("[data-file]");
+  if (copy) {
+    try { await navigator.clipboard.writeText(copy.dataset.copy); } catch (_) {}
+    const old = copy.textContent;
+    copy.textContent = "Copied";
+    setTimeout(() => { copy.textContent = old; }, 900);
+  }
+  if (file) { state.fileId = file.dataset.file; render(); }
+});
+
+document.getElementById("app").addEventListener("change", e => {
+  const box = e.target.closest("[data-switch]");
+  if (!box) return;
+  state.switches[Number(box.dataset.switch)].on = box.checked;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
